@@ -597,19 +597,117 @@
       }
     });
 
+    
     // 8) Chat (draggable + close)
-    (function(){
-      var chatLauncher=document.getElementById('chatLauncher');
-      var chatWin=document.getElementById('chatWin');
-      var chatHeader=document.getElementById('chatHeader');
-      var chatLog=document.getElementById('chatLog');
-      var chatForm=document.getElementById('chatForm');
-      var chatInput=document.getElementById('chatInput');
-      document.addEventListener('click', function(e){ var btn=e.target.closest? e.target.closest('[data-close="#chatWin"]') : null; if(btn){ chatWin.classList.add('hidden'); }});
-      chatLauncher.addEventListener('click', function(){ chatWin.classList.remove('hidden'); });
-      (function(){ var dragging=false, startX=0, startY=0, startLeft=0, startTop=0; function onPointerDown(e){ if(e.target.closest&&e.target.closest('[data-close="#chatWin"]')) return; dragging=true; chatHeader.setPointerCapture(e.pointerId); chatWin.classList.add('dragging'); var rect=chatWin.getBoundingClientRect(); startLeft=rect.left; startTop=rect.top; startX=e.clientX; startY=e.clientY; } function onPointerMove(e){ if(!dragging) return; var dx=e.clientX-startX; var dy=e.clientY-startY; var newLeft=Math.max(8, Math.min(window.innerWidth-chatWin.offsetWidth-8, startLeft+dx)); var newTop=Math.max(8, Math.min(window.innerHeight-chatWin.offsetHeight-8, startTop+dy)); chatWin.style.left=newLeft+'px'; chatWin.style.top=newTop+'px'; chatWin.style.right='auto'; chatWin.style.bottom='auto'; } function onPointerUp(e){ dragging=false; try{ chatHeader.releasePointerCapture(e.pointerId);}catch(err){} chatWin.classList.remove('dragging'); } chatHeader.addEventListener('pointerdown', onPointerDown); window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp); })();
-      chatForm.addEventListener('submit', function(e){ e.preventDefault(); var msgVal=(chatInput&&chatInput.value)? chatInput.value.trim():''; if(!msgVal) return; var bubble=document.createElement('div'); bubble.className='ml-auto max-w-[80%] bg-blue-600 text-white px-3 py-2 rounded-xl'; bubble.textContent=msgVal; chatLog.appendChild(bubble); chatInput.value=''; var typing=document.createElement('div'); typing.className='text-gray-500 text-sm'; typing.textContent='Assistant is typing...'; chatLog.appendChild(typing); chatLog.scrollTop=chatLog.scrollHeight; setTimeout(function(){ typing.remove(); var ans=document.createElement('div'); ans.className='mr-auto max-w-[80%] bg-gray-100 px-3 py-2 rounded-xl'; ans.textContent='Thanks! In this mockup, responses are simulated. Connect your backend to go live.'; chatLog.appendChild(ans); chatLog.scrollTop=chatLog.scrollHeight; }, 700); });
-    })();
+(function () {
+  var chatLauncher = document.getElementById('chatLauncher');
+  var chatWin = document.getElementById('chatWin');
+  var chatHeader = document.getElementById('chatHeader');
+  var chatLog = document.getElementById('chatLog');
+  var chatForm = document.getElementById('chatForm');
+  var chatInput = document.getElementById('chatInput');
+
+  // close button (X)
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-close="#chatWin"]') : null;
+    if (btn) { chatWin.classList.add('hidden'); }
+  });
+
+  // open chat
+  chatLauncher.addEventListener('click', function () {
+    chatWin.classList.remove('hidden');
+  });
+
+  // drag support (unchanged behavior)
+  (function () {
+    var dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    function onPointerDown(e) {
+      if (e.target.closest && e.target.closest('[data-close="#chatWin"]')) return;
+      dragging = true;
+      try { chatHeader.setPointerCapture(e.pointerId); } catch (_) {}
+      chatWin.classList.add('dragging');
+      var rect = chatWin.getBoundingClientRect();
+      startLeft = rect.left; startTop = rect.top;
+      startX = e.clientX; startY = e.clientY;
+    }
+    function onPointerMove(e) {
+      if (!dragging) return;
+      var dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      var newLeft = Math.max(8, Math.min(window.innerWidth - chatWin.offsetWidth - 8, startLeft + dx));
+      var newTop = Math.max(8, Math.min(window.innerHeight - chatWin.offsetHeight - 8, startTop + dy));
+      chatWin.style.left = newLeft + 'px';
+      chatWin.style.top = newTop + 'px';
+      chatWin.style.right = 'auto';
+      chatWin.style.bottom = 'auto';
+    }
+    function onPointerUp(e) {
+      dragging = false;
+      try { chatHeader.releasePointerCapture(e.pointerId); } catch (_) {}
+      chatWin.classList.remove('dragging');
+    }
+    chatHeader.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  })();
+
+  // === NEW: host endpoint + bubble helper ===
+  const HOST_BASE = 'http://localhost:8799'; // change if you deploy elsewhere
+
+  function appendBubble(target, text, side) {
+    var bubble = document.createElement('div');
+    bubble.className = (side === 'user'
+      ? 'ml-auto max-w-[80%] bg-blue-600 text-white px-3 py-2 rounded-xl'
+      : 'mr-auto max-w-[80%] bg-gray-100 px-3 py-2 rounded-xl');
+    bubble.textContent = text;
+    target.appendChild(bubble);
+    target.scrollTop = target.scrollHeight;
+    return bubble;
+  }
+
+  // === UPDATED: real submit handler calling /chat ===
+  chatForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    var msgVal = (chatInput && chatInput.value) ? chatInput.value.trim() : '';
+    if (!msgVal) return;
+
+    // user bubble
+    appendBubble(chatLog, msgVal, 'user');
+    chatInput.value = '';
+
+    // typing indicator
+    var typing = document.createElement('div');
+    typing.className = 'text-gray-500 text-sm';
+    typing.textContent = 'Assistant is typing…';
+    chatLog.appendChild(typing);
+    chatLog.scrollTop = chatLog.scrollHeight;
+
+    try {
+      var resp = await fetch(HOST_BASE + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msgVal })
+      });
+
+      var data = await resp.json();
+      typing.remove();
+
+      if (resp.ok && data && typeof data.answer === 'string') {
+        appendBubble(chatLog, data.answer, 'assistant');
+      } else {
+        var errText = data && data.error
+          ? (typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
+          : 'Unknown server response';
+        appendBubble(chatLog, 'Error: ' + errText, 'assistant');
+      }
+    } catch (err) {
+      typing.remove();
+      appendBubble(chatLog, 'Network error: ' + err, 'assistant');
+    }
+  });
+})();
+
 
     // 9) "Submit your question" -> fake email wiring
     (function(){ var submitModal=document.getElementById('submitModal'); var cancelSubmit=document.getElementById('cancelSubmit'); var closeBtn=submitModal.querySelector('[aria-label="Close"]'); var form=document.getElementById('submitForm'); var msg=document.getElementById('submitMsg'); if(cancelSubmit) cancelSubmit.addEventListener('click', function(){ closeDialog(submitModal); }); if(closeBtn) closeBtn.addEventListener('click', function(){ closeDialog(submitModal); }); form.addEventListener('submit', function(e){ e.preventDefault(); var data={ topic:document.getElementById('topic').value, permitType:document.getElementById('permitType').value, question:document.getElementById('question').value, email:document.getElementById('email').value }; console.log('Simulated email send to abccity@city.gov', data); if(msg) msg.classList.remove('hidden'); setTimeout(function(){ closeDialog(submitModal); alert('Form submitted successfully! (sent to abccity@city.gov - simulation)'); form.reset(); if(msg) msg.classList.add('hidden'); }, 800); }); })();
@@ -983,6 +1081,7 @@
 </body>
   
 </html>
+
 
 
 
