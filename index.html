@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>City-Wide Permitting Assistant - Full Working Mockup (Stabilized)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <meta name="color-scheme" content="light only">
+  <style>
+    .badge{font-size:10px;text-transform:uppercase;letter-spacing:.06em;background:#FEF3C7;color:#92400E;padding:2px 6px;border-radius:6px}
+    dialog::backdrop{background:rgba(0,0,0,.45)}
+    .icon-bg{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;padding:8px}
+    .comment-bubble{background:#f3f4f6;border-radius:10px;padding:8px 10px}
+    .dragging{cursor:grabbing}
+  </style>
+  <style>
+  /* Extra breathing room for the mobile sticky bar */
+  @media (max-width: 768px) {
+    body { padding-bottom: 80px; }
+    #chatLauncher { bottom: 80px !important; } /* keep your floating button above the bar */
+  }
+
+  /* Tablet tweaks (optional, gentle) */
+  @media (min-width: 768px) and (max-width: 1024px) {
+    main { gap: 1.25rem; }
+  }
+
+  /* Improve focus outlines for keyboard users */
+  :focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; border-radius: 6px; }
+</style>
+  <style>
+  /* Ensure correct stacking order */
+  #mobileActions { z-index: 40; }
+  #chatWin       { z-index: 60; } /* above the sticky bar */
+  #chatLauncher  { z-index: 70; } /* above everything else */
+
+  /* Keep launcher clear of the sticky bar on mobile */
+  @media (max-width: 768px) {
+    body { padding-bottom: 80px; }
+    #chatLauncher { bottom: 80px !important; }
+  }
+
+  /* Make dragging feel native on touch */
+  #chatHeader { touch-action: none; }
+</style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-blue-700 focus:px-3 focus:py-2 focus:rounded">
+  Skip to main content
+</a>
+  <!-- Header banner constrained to page width -->
+  <header class="sticky top-0 z-30 bg-transparent">
+    <div class="mx-auto max-w-7xl w-full px-4">
+      <div class="bg-blue-600 text-white w-full px-4 py-3 flex items-center gap-3 rounded-b-xl">
+        <button id="menuBtn" class="md:hidden inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-300/60">
+          <span class="text-lg">☰</span><span class="text-sm">Menu</span>
+        </button>
+        <h1 class="text-xl md:text-2xl font-semibold">City-Wide Permitting Assistant</h1>
+        <nav class="ml-auto hidden md:flex items-center gap-6 text-sm">
+          <a href="#" class="hover:underline">Home</a>
+          <a href="#forums" class="hover:underline">Browse Forums</a>
+          <a href="#promote" class="hover:underline">Promotions</a>
+          <a href="#faq" class="hover:underline">FAQs</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="bg-white border border-gray-200 rounded-2xl p-4 md:sticky md:top-20 h-max">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-semibold">Search</h3>
+        <span class="badge"> </span>
+      </div>
+      <form id="siteSearchForm" class="mb-6" role="search">
+        <label class="sr-only" for="siteSearch">Search</label>
+        <div class="flex items-center gap-2 flex-nowrap w-full min-w-0 overflow-hidden">
+          <input id="siteSearch" class="flex-1 min-w-0 h-10 px-3 py-2 border rounded-lg" type="search" placeholder="Search sections..." />
+          <button id="siteSearchBtn" class="h-10 px-3 border rounded-lg bg-gray-50 shrink-0 inline-flex items-center justify-center" aria-label="Search">
+            <i data-lucide="search" class="w-4 h-4"></i><span class="sr-only">Search</span>
+          </button>
+        </div>
+        <p id="searchHelp" class="mt-2 text-xs text-gray-500 hidden">Filtering visible cards...</p>
+      </form>
+
+      <h3 class="text-lg font-semibold mb-2">Useful links</h3>
+      <ul class="space-y-2 text-sm">
+        <li><a class="text-blue-700 hover:underline" href="https://planning.baltimorecity.gov" target="_blank" rel="noopener">City Planning Department</a></li>
+        <li><a class="text-blue-700 hover:underline" href="https://dhcd.baltimorecity.gov" target="_blank" rel="noopener">Commercial Permit Guidelines</a></li>
+        <li><a class="text-blue-700 hover:underline" href="https://dhcd.baltimorecity.gov" target="_blank" rel="noopener">Residential Permit Checklist</a></li>
+        <li><a class="text-blue-700 hover:underline" href="https://dhcd.baltimorecity.gov" target="_blank" rel="noopener">Demolition Permit Requirements</a></li>
+        <li><a class="text-blue-700 hover:underline" href="#">Use &amp; Occupancy Forms</a></li>
+        <li><a class="text-blue-700 hover:underline" href="https://bcrp.baltimorecity.gov" target="_blank" rel="noopener">Special Events Permitting</a></li>
+        <li><a class="text-blue-700 hover:underline" href="https://transportation.baltimorecity.gov" target="_blank" rel="noopener">ROW (Right-of-Way) Permits</a></li>
+        <li><a class="text-blue-700 hover:underline" href="https://llb.baltimorecity.gov" target="_blank" rel="noopener">Liquor Board / Alcohol Licensing</a></li>
+        <li><a class="text-blue-700 hover:underline" href="#">Temporary Permits &amp; Short-Term Approvals</a></li>
+      </ul>
+
+      <button class="mt-6 w-full px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700" data-open="submitModal">Submit your question to the City</button>
+    </aside>
+
+    <!-- Content -->
+    <section class="space-y-8">
+      <!-- Forums -->
+      <section id="forums" class="bg-white border border-gray-200 rounded-2xl p-5">
+        <header class="flex items-center justify-between gap-4 mb-4">
+          <h2 class="text-xl font-semibold">Learn and Discuss City's Different Permits</h2>
+          <button class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700" data-open="learnModal" title="Start a new discussion">Start Discussion</button>
+        </header>
+        <ul class="grid sm:grid-cols-2 gap-3 text-sm text-gray-700 mb-6">
+          <li data-card><a href="#" class="hover:underline text-blue-700">Commercial Permits</a></li>
+          <li data-card><a href="#" class="hover:underline text-blue-700">Residential Permits</a></li>
+          <li data-card><a href="#" class="hover:underline text-blue-700">Demolition Permits</a></li>
+          <li data-card><a href="#" class="hover:underline text-blue-700">Use &amp; Occupancy Permits</a></li>
+          <li data-card><a href="#" class="hover:underline text-blue-700">Special Events Permits</a></li>
+          <li data-card><a href="#" class="hover:underline text-blue-700">ROW Permits</a></li>
+          <li data-card><a href="#" class="hover:underline text-blue-700">Liquor Board Permits</a></li>
+          <li data-card><a href="#" class="hover:underline text-blue-700">Temporary Permits</a></li>
+        </ul>
+        <div id="topicList" class="grid gap-4">
+          <!-- Card 1 -->
+          <article class="border rounded-xl p-4 flex items-start gap-4" data-card data-title="Understanding Zoning Laws">
+            <span class="icon-bg bg-indigo-50"><i data-lucide="building-2" class="w-6 h-6 text-indigo-600"></i></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="font-medium"><a href="#" class="text-blue-700 hover:underline">Understanding Zoning Laws</a></h3>
+                <div class="text-xs text-gray-500 whitespace-nowrap">8 replies</div>
+              </div>
+              <div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>John</span>
+                <span>- 2 hours ago</span>
+                <span>- 120 views</span>
+                <span>- 15 likes</span>
+              </div>
+              <div class="comments mt-3 space-y-2"></div>
+              <form class="inline-reply mt-3 hidden">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="message-square" class="w-5 h-5 text-blue-600 mt-2"></i>
+                  <textarea class="flex-1 border rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Write a reply..."></textarea>
+                  <div class="flex flex-col gap-2">
+                    <button type="submit" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Submit</button>
+                    <button type="button" class="px-3 py-2 rounded-lg border text-sm" data-inline-cancel>Cancel</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <button class="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700" data-inline-reply aria-label="Reply">
+              <i data-lucide="message-circle" class="w-4 h-4"></i>
+            </button>
+          </article>
+          <!-- Card 2 -->
+          <article class="border rounded-xl p-4 flex items-start gap-4" data-card data-title="Tips for Obtaining a Building Permit">
+            <span class="icon-bg bg-amber-50"><i data-lucide="hammer" class="w-6 h-6 text-amber-600"></i></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="font-medium"><a href="#" class="text-blue-700 hover:underline">Tips for Obtaining a Building Permit</a></h3>
+                <div class="text-xs text-gray-500 whitespace-nowrap">12 replies</div>
+              </div>
+              <div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>Sarah</span>
+                <span>- 4 hours ago</span>
+                <span>- 98 views</span>
+                <span>- 20 likes</span>
+              </div>
+              <div class="comments mt-3 space-y-2"></div>
+              <form class="inline-reply mt-3 hidden">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="message-square" class="w-5 h-5 text-blue-600 mt-2"></i>
+                  <textarea class="flex-1 border rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Write a reply..."></textarea>
+                  <div class="flex flex-col gap-2">
+                    <button type="submit" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Submit</button>
+                    <button type="button" class="px-3 py-2 rounded-lg border text-sm" data-inline-cancel>Cancel</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <button class="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700" data-inline-reply aria-label="Reply">
+              <i data-lucide="message-circle" class="w-4 h-4"></i>
+            </button>
+          </article>
+          <!-- Card 3 -->
+          <article class="border rounded-xl p-4 flex items-start gap-4" data-card data-title="Navigating the Inspection Process">
+            <span class="icon-bg bg-emerald-50"><i data-lucide="clipboard-check" class="w-6 h-6 text-emerald-600"></i></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="font-medium"><a href="#" class="text-blue-700 hover:underline">Navigating the Inspection Process</a></h3>
+                <div class="text-xs text-gray-500 whitespace-nowrap">5 replies</div>
+              </div>
+              <div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>Michael</span>
+                <span>- 1 day ago</span>
+                <span>- 76 views</span>
+                <span>- 8 likes</span>
+              </div>
+              <div class="comments mt-3 space-y-2"></div>
+              <form class="inline-reply mt-3 hidden">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="message-square" class="w-5 h-5 text-blue-600 mt-2"></i>
+                  <textarea class="flex-1 border rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Write a reply..."></textarea>
+                  <div class="flex flex-col gap-2">
+                    <button type="submit" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Submit</button>
+                    <button type="button" class="px-3 py-2 rounded-lg border text-sm" data-inline-cancel>Cancel</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <button class="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700" data-inline-reply aria-label="Reply">
+              <i data-lucide="message-circle" class="w-4 h-4"></i>
+            </button>
+          </article>
+        </div>
+      </section>
+
+      <!-- Promote businesses (with right-corner replies badge & reply button) -->
+      <section id="promote" class="bg-white border border-gray-200 rounded-2xl p-5">
+        <header class="mb-4 flex items-center justify-between">
+          <h2 class="text-xl font-semibold">Promote your upcoming businesses</h2>
+          <div class="flex items-center gap-3">
+            <span class="badge"></span>
+            <button class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700" data-open="promoteModal">Promote your business</button>
+          </div>
+        </header>
+        <div id="promoList" class="grid gap-4">
+          <article class="relative border rounded-xl p-4 flex gap-3 items-start" data-card data-title="New Restaurant Opening">
+            <span class="icon-bg bg-rose-50"><i data-lucide="store" class="w-6 h-6 text-rose-600"></i></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-3 pr-16">
+                <h3 class="font-medium"><a href="#" class="text-blue-700 hover:underline">New Restaurant Opening</a></h3>
+              </div>
+              <div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1 pr-16">
+                <span>Lisa</span>
+                <span>- 1 day ago</span>
+                <span>- 320 views</span>
+                <span>- 45 likes</span>
+              </div>
+              <div class="comments mt-3 space-y-2"></div>
+              <form class="inline-reply mt-3 hidden">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="message-square" class="w-5 h-5 text-blue-600 mt-2"></i>
+                  <textarea class="flex-1 border rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Write a reply to this promotion..."></textarea>
+                  <div class="flex flex-col gap-2">
+                    <button type="submit" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Submit</button>
+                    <button type="button" class="px-3 py-2 rounded-lg border text-sm" data-inline-cancel>Cancel</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <button class="absolute top-2 right-2 p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700" data-inline-reply aria-label="Reply">
+              <i data-lucide="message-circle" class="w-4 h-4"></i>
+            </button>
+            <span class="absolute top-3 right-14 text-xs text-gray-500">9 replies</span>
+          </article>
+          <article class="relative border rounded-xl p-4 flex gap-3 items-start" data-card data-title="Boutique Retail Store Plans">
+            <span class="icon-bg bg-teal-50"><i data-lucide="shopping-bag" class="w-6 h-6 text-teal-600"></i></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-3 pr-16">
+                <h3 class="font-medium"><a href="#" class="text-blue-700 hover:underline">Boutique Retail Store Plans</a></h3>
+              </div>
+              <div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1 pr-16">
+                <span>David</span>
+                <span>- 2 days ago</span>
+                <span>- 250 views</span>
+                <span>- 30 likes</span>
+              </div>
+              <div class="comments mt-3 space-y-2"></div>
+              <form class="inline-reply mt-3 hidden">
+                <div class="flex items-start gap-2">
+                  <i data-lucide="message-square" class="w-5 h-5 text-blue-600 mt-2"></i>
+                  <textarea class="flex-1 border rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Write a reply to this promotion..."></textarea>
+                  <div class="flex flex-col gap-2">
+                    <button type="submit" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Submit</button>
+                    <button type="button" class="px-3 py-2 rounded-lg border text-sm" data-inline-cancel>Cancel</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <button class="absolute top-2 right-2 p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700" data-inline-reply aria-label="Reply">
+              <i data-lucide="message-circle" class="w-4 h-4"></i>
+            </button>
+            <span class="absolute top-3 right-14 text-xs text-gray-500">6 replies</span>
+          </article>
+        </div>
+      </section>
+
+      <!-- FAQs -->
+      <section id="faq" class="bg-white border border-gray-200 rounded-2xl p-5">
+        <h2 class="text-xl font-semibold mb-3">FAQs</h2>
+        <ul class="list-disc pl-5 space-y-2 text-sm">
+          <li><strong>What are the different permit types?</strong> - Commercial, Residential, Demolition, Use &amp; Occupancy, Special Events, ROW, Liquor Board, and Temporary.</li>
+          <li><strong>How long does it take for approval?</strong> - Simple permits take days; complex ones may take weeks or months.</li>
+          <li><strong>Where can I find applications?</strong> - See Useful Links in the left navigation.</li>
+          <li><strong>Who to contact for help?</strong> - Use the chat or submit a question from the sidebar button.</li>
+        </ul>
+      </section>
+    </section>
+  </main>
+
+  <!-- Floating AI chat launcher -->
+  <button id="chatLauncher" class="fixed bottom-6 right-6 z-50 rounded-full shadow-lg px-5 py-3 bg-blue-600 text-white hover:bg-blue-700">Start | Ask City | Chat</button>
+
+  <!-- Chat window (draggable) -->
+  <div id="chatWin" class="hidden fixed md:w-[360px] md:h-[520px] z-40" style="right:24px; bottom:24px;">
+    <div class="h-full md:rounded-2xl shadow-2xl border bg-white flex flex-col">
+      <div id="chatHeader" class="flex items-center justify-between p-3 border-b cursor-move select-none">
+        <strong>City Permitting Assistant</strong>
+        <button class="text-xl leading-none px-2" data-close="#chatWin" aria-label="Close chat">x</button>
+      </div>
+      <div id="chatLog" class="flex-1 overflow-auto p-3 space-y-2 text-sm">
+        <div class="text-gray-600">Thank you for contacting City Permitting Assistant, what can I help you with today?</div>
+      </div>
+      <form id="chatForm" class="p-3 border-t flex gap-2">
+        <input id="chatInput" class="flex-1 border rounded-lg px-3 py-2" placeholder="Type your message..." />
+        <button class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Start Discussion Modal -->
+  <dialog id="learnModal" class="rounded-2xl w-[min(680px,95vw)] p-0">
+    <form method="dialog" class="p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold">Start Discussion</h2>
+        <button class="text-xl leading-none px-2" aria-label="Close">x</button>
+      </div>
+      <div class="grid gap-4">
+        <label class="grid gap-1 text-sm">
+          <span>Topic</span>
+          <select class="border rounded-lg px-3 py-2">
+            <option>Permits</option><option>Zoning laws</option><option>Appeals</option>
+            <option>Permit fees</option><option>Inspections</option><option>Other</option>
+          </select>
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>Permit type</span>
+          <select class="border rounded-lg px-3 py-2">
+            <option>Commercial Permits</option><option>Residential Permits</option>
+            <option>Demolition Permits</option><option>Use &amp; Occupancy Permits</option>
+            <option>Special Events Permits</option><option>ROW (Right-of-Way) Permits</option>
+            <option>Liquor Board Permits</option><option>Temporary Permits</option><option>Other / Not sure</option>
+          </select>
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>Question / Comment</span>
+          <textarea class="border rounded-lg px-3 py-2 min-h-28"></textarea>
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>Email</span>
+          <input type="email" class="border rounded-lg px-3 py-2" placeholder="you@example.com" />
+        </label>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button class="px-4 py-2 rounded-lg border" value="cancel">Cancel</button>
+        <button class="px-4 py-2 rounded-lg bg-blue-600 text-white" value="submit">Submit</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Submit Question Modal (wired to fake email) -->
+  <dialog id="submitModal" class="rounded-2xl w-[min(680px,95vw)] p-0">
+    <form id="submitForm" class="p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold">Submit your question to the City</h2>
+        <button type="button" class="text-xl leading-none px-2" aria-label="Close">x</button>
+      </div>
+      <div class="grid gap-4">
+        <label class="grid gap-1 text-sm">
+          <span>Topic</span>
+          <select id="topic" class="border rounded-lg px-3 py-2">
+            <option>Permits</option><option>Zoning laws</option><option>Appeals</option>
+            <option>Permit fees</option><option>Inspections</option><option>Other</option>
+          </select>
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>Permit type</span>
+          <select id="permitType" class="border rounded-lg px-3 py-2">
+            <option>Commercial Permits</option><option>Residential Permits</option>
+            <option>Demolition Permits</option><option>Use &amp; Occupancy Permits</option>
+            <option>Special Events Permits</option><option>ROW (Right-of-Way) Permits</option>
+            <option>Liquor Board Permits</option><option>Temporary Permits</option><option>Other / Not sure</option>
+          </select>
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>Question / Comment</span>
+          <textarea id="question" class="border rounded-lg px-3 py-2 min-h-28"></textarea>
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>Email</span>
+          <input id="email" type="email" class="border rounded-lg px-3 py-2" placeholder="you@example.com" />
+        </label>
+      </div>
+      <div id="submitMsg" class="text-green-600 text-sm hidden">Your question has been sent to abccity@city.gov (simulation)</div>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="px-4 py-2 rounded-lg border" id="cancelSubmit">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white">Submit</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Promote Business Modal -->
+  <dialog id="promoteModal" class="rounded-2xl w-[min(680px,95vw)] p-0">
+    <form method="dialog" class="p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold">Promote your business</h2>
+        <button class="text-xl leading-none px-2" aria-label="Close">x</button>
+      </div>
+      <div class="grid gap-4">
+        <label class="grid gap-1 text-sm">
+          <span>Business name</span>
+          <input type="text" class="border rounded-lg px-3 py-2" placeholder="e.g., Harbor Cafe" />
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>Opening date</span>
+          <input type="date" class="border rounded-lg px-3 py-2" />
+        </label>
+        <label class="grid gap-1 text-sm">
+          <span>What is the business about?</span>
+          <textarea class="border rounded-lg px-3 py-2 min-h-28" placeholder="Short description"></textarea>
+        </label>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button class="px-4 py-2 rounded-lg border" value="cancel">Cancel</button>
+        <button class="px-4 py-2 rounded-lg bg-blue-600 text-white" value="submit">Submit</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // 1) Lucide init (robust)
+    (function(){
+      function init(){ if (window.lucide && typeof window.lucide.createIcons === 'function') { window.lucide.createIcons(); } }
+      if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+    })();
+
+    // 2) Mobile sidebar toggle
+    (function(){
+      var menuBtn = document.getElementById('menuBtn');
+      var sidebar = document.getElementById('sidebar');
+      if (!menuBtn) return;
+      menuBtn.addEventListener('click', function(){
+        sidebar.classList.toggle('hidden');
+        sidebar.classList.toggle('absolute');
+        sidebar.classList.toggle('top-16');
+        sidebar.classList.toggle('left-4');
+        sidebar.classList.toggle('right-4');
+        sidebar.classList.toggle('z-20');
+      });
+    })();
+
+    // 3) Dialog helpers (polyfill-lite)
+    var supportsNativeDialog = typeof HTMLDialogElement === 'function' && 'showModal' in document.createElement('dialog');
+    var backdrop = document.createElement('div');
+    backdrop.className = 'fixed inset-0 bg-black/45 hidden';
+    document.body.appendChild(backdrop);
+    function openDialog(dlg){ if(!dlg) return; if (supportsNativeDialog){ dlg.showModal(); return; } dlg.setAttribute('open',''); dlg.style.position='fixed'; dlg.style.top='50%'; dlg.style.left='50%'; dlg.style.transform='translate(-50%,-50%)'; dlg.style.maxHeight='90vh'; dlg.style.overflow='auto'; backdrop.classList.remove('hidden'); }
+    function closeDialog(dlg){ if(!dlg) return; if (supportsNativeDialog){ dlg.close(); return; } dlg.removeAttribute('open'); backdrop.classList.add('hidden'); }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function(btn){ btn.addEventListener('click', function(){ openDialog(document.getElementById(btn.getAttribute('data-open'))); }); });
+    Array.prototype.forEach.call(document.querySelectorAll('dialog button'), function(b){ if (b.getAttribute('aria-label')==='Close' || b.value==='cancel'){ b.addEventListener('click', function(){ closeDialog(b.closest('dialog')); }); } });
+    Array.prototype.forEach.call(document.querySelectorAll('dialog'), function(dlg){ dlg.addEventListener('click', function(e){ if(e.target===dlg) closeDialog(dlg); }); });
+    window.addEventListener('keydown', function(e){ if(e.key==='Escape'){ var openDlgs = Array.prototype.slice.call(document.querySelectorAll('dialog[open]')); var top = openDlgs.pop(); if(top) closeDialog(top); }});
+
+    // 3a) Confirm dialog helper (consistent UI prompt)
+    function ensureConfirmDialog(){
+      var dlg = document.getElementById('confirmDialog');
+      if (dlg) return dlg;
+      dlg = document.createElement('dialog');
+      dlg.id = 'confirmDialog';
+      dlg.className = 'rounded-2xl w-[min(420px,95vw)] p-0';
+      dlg.innerHTML = '\n        <form method="dialog" class="p-5 space-y-4">\n          <div class="text-base font-medium" data-msg>Are you sure?</div>\n          <div class="flex justify-end gap-2">\n            <button value="cancel" class="px-4 py-2 rounded-lg border">Cancel</button>\n            <button value="ok" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Delete</button>\n          </div>\n        </form>\n      ';
+      document.body.appendChild(dlg);
+      return dlg;
+    }
+    function askConfirm(message){
+      return new Promise(function(resolve){
+        var dlg = ensureConfirmDialog();
+        var msgEl = dlg.querySelector('[data-msg]');
+        if (msgEl) msgEl.textContent = message || 'Are you sure?';
+        if (typeof dlg.showModal === 'function'){
+          dlg.returnValue = '';
+          dlg.showModal();
+          var onClose = function(){ dlg.removeEventListener('close', onClose); resolve(dlg.returnValue === 'ok'); };
+          dlg.addEventListener('close', onClose);
+        } else {
+          // fallback to polyfill open/close
+          openDialog(dlg);
+          var okBtn = dlg.querySelector('[value="ok"]');
+          var cancelBtn = dlg.querySelector('[value="cancel"]');
+          function cleanup(result){ okBtn.removeEventListener('click', okH); cancelBtn.removeEventListener('click', cancelH); closeDialog(dlg); resolve(result); }
+          function okH(){ cleanup(true); }
+          function cancelH(){ cleanup(false); }
+          okBtn.addEventListener('click', okH);
+          cancelBtn.addEventListener('click', cancelH);
+        }
+      });
+    }
+
+    // 4) Search filter
+    function filterCards(inputEl, selector){ var q=(inputEl.value||'').trim().toLowerCase(); var cards=document.querySelectorAll(selector); var shown=0; cards.forEach(function(el){ var text=((el.dataset&&el.dataset.title)||el.textContent||'').toLowerCase(); var match=!q||text.indexOf(q)!==-1; el.classList.toggle('hidden', !match); if(match) shown++; }); return shown; }
+    (function(){ var siteSearchForm=document.getElementById('siteSearchForm'); var siteSearch=document.getElementById('siteSearch'); var searchHelp=document.getElementById('searchHelp'); siteSearchForm.addEventListener('submit', function(e){ e.preventDefault(); var n=filterCards(siteSearch,'[data-card]'); if(searchHelp){searchHelp.classList.remove('hidden'); searchHelp.textContent='Showing '+n+' matching item(s)';} }); siteSearch.addEventListener('input', function(){ var n=filterCards(siteSearch,'[data-card]'); if(searchHelp){searchHelp.classList.remove('hidden'); searchHelp.textContent='Showing '+n+' matching item(s)';} }); })();
+
+    // 5) Comment factory (inline edit/delete with confirm + editing badge)
+    function makeCommentEl(text){
+      var wrap = document.createElement('div');
+      wrap.className = 'comment-bubble flex justify-between items-start gap-2';
+
+      var content = document.createElement('div');
+      content.className = 'flex-1 text-sm';
+
+      var textSpan = document.createElement('span');
+      textSpan.className = 'reply-text';
+      textSpan.textContent = text;
+
+      var youSpan = document.createElement('span');
+      youSpan.className = 'text-gray-500';
+      youSpan.textContent = ' (You)';
+
+      content.appendChild(textSpan);
+      content.appendChild(youSpan);
+
+      var actions = document.createElement('div');
+      actions.className = 'flex gap-2';
+
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button'; editBtn.title = 'Edit'; editBtn.setAttribute('data-edit',''); editBtn.className = 'p-1';
+      var editIcon = document.createElement('i'); editIcon.setAttribute('data-lucide','edit-3'); editIcon.className = 'w-4 h-4 text-gray-500';
+      editBtn.appendChild(editIcon);
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button'; delBtn.title = 'Delete'; delBtn.setAttribute('data-delete',''); delBtn.className = 'p-1';
+      var delIcon = document.createElement('i'); delIcon.setAttribute('data-lucide','trash-2'); delIcon.className = 'w-4 h-4 text-gray-500';
+      delBtn.appendChild(delIcon);
+
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+
+      function enterEdit(){
+        wrap.dataset.original = textSpan.textContent;
+        var editorRow = document.createElement('div'); editorRow.className = 'flex items-start gap-2';
+        var msgIcon = document.createElement('i'); msgIcon.setAttribute('data-lucide','message-square'); msgIcon.className = 'w-5 h-5 text-blue-600 mt-2';
+        var ta = document.createElement('textarea'); ta.className = 'flex-1 border rounded-lg px-3 py-2 text-sm'; ta.rows = 2; ta.value = textSpan.textContent;
+        var btnCol = document.createElement('div'); btnCol.className = 'flex flex-col gap-2';
+        var save = document.createElement('button'); save.type = 'button'; save.textContent = 'Save'; save.className = 'px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm'; save.setAttribute('data-save','');
+        var cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.className = 'px-3 py-2 rounded-lg border text-sm'; cancel.setAttribute('data-cancel','');
+        btnCol.appendChild(save); btnCol.appendChild(cancel);
+        editorRow.appendChild(msgIcon); editorRow.appendChild(ta); editorRow.appendChild(btnCol);
+        content.replaceChildren(editorRow);
+        // editing badge
+        if (!actions.querySelector('[data-editing-badge]')) {
+          var badge = document.createElement('span');
+          badge.className = 'ml-1 text-xs text-blue-700 bg-blue-50 rounded px-2 py-0.5';
+          badge.textContent = 'editing...';
+          badge.setAttribute('data-editing-badge','');
+          actions.appendChild(badge);
+        }
+        editIcon.setAttribute('data-lucide','check');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+        ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+        ta.addEventListener('keydown', function(ev){ if ((ev.ctrlKey||ev.metaKey)&&ev.key==='Enter') save.click(); if (ev.key==='Escape') cancel.click(); });
+        save.addEventListener('click', function(){ var newText = ta.value.trim(); textSpan.textContent = newText || wrap.dataset.original || ''; exitEdit(); });
+        cancel.addEventListener('click', function(){ exitEdit(); });
+      }
+      function exitEdit(){
+        content.replaceChildren(textSpan, youSpan);
+        var b = actions.querySelector('[data-editing-badge]'); if (b) b.remove();
+        editIcon.setAttribute('data-lucide','edit-3');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+      }
+
+      editBtn.addEventListener('click', function(){ var isEditing = !!content.querySelector('textarea'); if (!isEditing) enterEdit(); else { var saveBtn = content.querySelector('[data-save]'); if (saveBtn) saveBtn.click(); } });
+      delBtn.addEventListener('click', async function(e){
+        e.preventDefault(); e.stopPropagation();
+        var ok = await askConfirm('Delete this reply?');
+        if (ok) { wrap.remove(); }
+      });
+
+      wrap.appendChild(content);
+      wrap.appendChild(actions);
+      if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+      return wrap;
+    }
+
+    // 6) Inline reply toggles & submission
+    (function(){
+      Array.prototype.forEach.call(document.querySelectorAll('[data-inline-reply]'), function(btn){ if(btn._wired) return; btn._wired=true; btn.addEventListener('click', function(){ var card=btn.closest('article'); var form=card.querySelector('.inline-reply'); form.classList.toggle('hidden'); if(!form.classList.contains('hidden')){ var ta=form.querySelector('textarea'); if(ta) ta.focus(); card.scrollIntoView({behavior:'smooth', block:'center'}); } }); });
+      Array.prototype.forEach.call(document.querySelectorAll('.inline-reply'), function(form){ if(form._wired) return; form._wired=true; form.addEventListener('submit', function(e){ e.preventDefault(); var ta=form.querySelector('textarea'); var val=(ta&&ta.value?ta.value.trim():''); if(!val) return; var card=form.closest('article'); var container=card.querySelector('.comments'); if(!container){ container=document.createElement('div'); container.className='comments mt-3 space-y-2'; form.before(container); } container.appendChild(makeCommentEl(val)); if(window.lucide&&typeof window.lucide.createIcons==='function'){ window.lucide.createIcons(); } if(ta) ta.value=''; form.classList.add('hidden'); }); var cancelBtn=form.querySelector('[data-inline-cancel]'); if(cancelBtn) cancelBtn.addEventListener('click', function(){ form.classList.add('hidden'); }); });
+    })();
+
+    // 7) Global safety delegation for delete (covers dynamically added comments)
+    document.addEventListener('click', async function(e){
+      var delBtn = e.target.closest ? e.target.closest('[data-delete]') : null;
+      if (delBtn) {
+        var bubble = delBtn.closest('.comment-bubble');
+        e.preventDefault(); e.stopPropagation();
+        var ok = await askConfirm('Delete this reply?');
+        if (bubble && ok) { bubble.remove(); }
+      }
+    });
+
+    // 8) Chat (draggable + close)
+    (function(){
+      var chatLauncher=document.getElementById('chatLauncher');
+      var chatWin=document.getElementById('chatWin');
+      var chatHeader=document.getElementById('chatHeader');
+      var chatLog=document.getElementById('chatLog');
+      var chatForm=document.getElementById('chatForm');
+      var chatInput=document.getElementById('chatInput');
+      document.addEventListener('click', function(e){ var btn=e.target.closest? e.target.closest('[data-close="#chatWin"]') : null; if(btn){ chatWin.classList.add('hidden'); }});
+      chatLauncher.addEventListener('click', function(){ chatWin.classList.remove('hidden'); });
+      (function(){ var dragging=false, startX=0, startY=0, startLeft=0, startTop=0; function onPointerDown(e){ if(e.target.closest&&e.target.closest('[data-close="#chatWin"]')) return; dragging=true; chatHeader.setPointerCapture(e.pointerId); chatWin.classList.add('dragging'); var rect=chatWin.getBoundingClientRect(); startLeft=rect.left; startTop=rect.top; startX=e.clientX; startY=e.clientY; } function onPointerMove(e){ if(!dragging) return; var dx=e.clientX-startX; var dy=e.clientY-startY; var newLeft=Math.max(8, Math.min(window.innerWidth-chatWin.offsetWidth-8, startLeft+dx)); var newTop=Math.max(8, Math.min(window.innerHeight-chatWin.offsetHeight-8, startTop+dy)); chatWin.style.left=newLeft+'px'; chatWin.style.top=newTop+'px'; chatWin.style.right='auto'; chatWin.style.bottom='auto'; } function onPointerUp(e){ dragging=false; try{ chatHeader.releasePointerCapture(e.pointerId);}catch(err){} chatWin.classList.remove('dragging'); } chatHeader.addEventListener('pointerdown', onPointerDown); window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp); })();
+      chatForm.addEventListener('submit', function(e){ e.preventDefault(); var msgVal=(chatInput&&chatInput.value)? chatInput.value.trim():''; if(!msgVal) return; var bubble=document.createElement('div'); bubble.className='ml-auto max-w-[80%] bg-blue-600 text-white px-3 py-2 rounded-xl'; bubble.textContent=msgVal; chatLog.appendChild(bubble); chatInput.value=''; var typing=document.createElement('div'); typing.className='text-gray-500 text-sm'; typing.textContent='Assistant is typing...'; chatLog.appendChild(typing); chatLog.scrollTop=chatLog.scrollHeight; setTimeout(function(){ typing.remove(); var ans=document.createElement('div'); ans.className='mr-auto max-w-[80%] bg-gray-100 px-3 py-2 rounded-xl'; ans.textContent='Thanks! In this mockup, responses are simulated. Connect your backend to go live.'; chatLog.appendChild(ans); chatLog.scrollTop=chatLog.scrollHeight; }, 700); });
+    })();
+
+    // 9) "Submit your question" -> fake email wiring
+    (function(){ var submitModal=document.getElementById('submitModal'); var cancelSubmit=document.getElementById('cancelSubmit'); var closeBtn=submitModal.querySelector('[aria-label="Close"]'); var form=document.getElementById('submitForm'); var msg=document.getElementById('submitMsg'); if(cancelSubmit) cancelSubmit.addEventListener('click', function(){ closeDialog(submitModal); }); if(closeBtn) closeBtn.addEventListener('click', function(){ closeDialog(submitModal); }); form.addEventListener('submit', function(e){ e.preventDefault(); var data={ topic:document.getElementById('topic').value, permitType:document.getElementById('permitType').value, question:document.getElementById('question').value, email:document.getElementById('email').value }; console.log('Simulated email send to abccity@city.gov', data); if(msg) msg.classList.remove('hidden'); setTimeout(function(){ closeDialog(submitModal); alert('Form submitted successfully! (sent to abccity@city.gov - simulation)'); form.reset(); if(msg) msg.classList.add('hidden'); }, 800); }); })();
+
+    // 10) Smoke tests (expanded)
+    (function(){
+      try {
+        var results = [];
+        results.push(['lucide-loaded', !!window.lucide]);
+        results.push(['dialogs-exist', !!document.querySelector('dialog')]);
+        results.push(['reply-buttons>=3', document.querySelectorAll('[data-inline-reply]').length >= 3]);
+        // add & delete round-trip using confirm stub
+        var host = document.querySelector('#topicList article .comments') || document.querySelector('#promoList article .comments');
+        var okDelete = true, okAdd = true, okEditToggle = true;
+        if (host) {
+          var before = host.querySelectorAll('.comment-bubble').length;
+          var temp = makeCommentEl('temp-delete-test');
+          host.appendChild(temp);
+          okAdd = host.querySelectorAll('.comment-bubble').length === before + 1;
+          // edit badge toggle
+          var editBtn = temp.querySelector('[data-edit]');
+          if (editBtn) { editBtn.click(); okEditToggle = !!temp.querySelector('[data-editing-badge]'); }
+          // delete with confirm stub
+          var delBtn = temp.querySelector('[data-delete]');
+          var _ask = window.askConfirm; window.askConfirm = function(){ return Promise.resolve(true); };
+          if (delBtn) { delBtn.click(); }
+          window.askConfirm = _ask;
+          okDelete = host.querySelectorAll('.comment-bubble').length === before;
+        }
+        results.push(['add-reply-inserts', okAdd]);
+        results.push(['delete-removes-bubble', okDelete]);
+        results.push(['edit-badge-appears', okEditToggle]);
+        var failing = results.filter(function(x){ return !x[1]; });
+        if (failing.length) { console.warn('SMOKE TESTS FAILED:', results); }
+      } catch (e) { console.warn('Smoke tests error', e); }
+    })();
+  </script>
+<!-- Mobile sticky action bar (Submit / Discuss / Promote) -->
+<div id="mobileActions" class="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t p-2">
+  <div class="grid grid-cols-3 gap-2">
+    <button type="button" class="w-full px-3 py-2 rounded-lg bg-blue-600 text-white" data-open="submitModal" aria-label="Submit a question">
+      Submit
+    </button>
+    <button type="button" class="w-full px-3 py-2 rounded-lg bg-blue-600 text-white" data-open="learnModal" aria-label="Start a discussion">
+      Discuss
+    </button>
+    <button type="button" class="w-full px-3 py-2 rounded-lg bg-blue-600 text-white" data-open="promoteModal" aria-label="Promote your business">
+      Promote
+    </button>
+  </div>
+</div>
+
+<script>
+  (function enhanceA11yAndMobile(){
+    // 1) Landmarks & labels (non-destructive; only adds when present)
+    var header = document.querySelector('header'); if (header && !header.hasAttribute('role')) header.setAttribute('role','banner');
+    var main = document.querySelector('main'); if (main){ if (!main.id) main.id = 'main'; if (!main.hasAttribute('role')) main.setAttribute('role','main'); }
+    var sidebar = document.getElementById('sidebar'); if (sidebar){ sidebar.setAttribute('role','complementary'); if (!sidebar.getAttribute('aria-label')) sidebar.setAttribute('aria-label','Sidebar'); }
+    var primaryNav = document.querySelector('header nav'); if (primaryNav && !primaryNav.getAttribute('aria-label')) primaryNav.setAttribute('aria-label','Primary');
+
+    // 2) Chat log: announce new messages to assistive tech
+    var chatLog = document.getElementById('chatLog');
+    if (chatLog){
+      chatLog.setAttribute('role','log');
+      chatLog.setAttribute('aria-live','polite');
+      chatLog.setAttribute('aria-relevant','additions');
+      chatLog.setAttribute('tabindex','0');
+    }
+
+    // 3) Mark Lucide icons as decorative if present
+    function hideDecorativeIcons(){
+      try {
+        var icons = document.querySelectorAll('[data-lucide]');
+        icons.forEach(function(i){ i.setAttribute('aria-hidden','true'); i.setAttribute('focusable','false'); });
+      } catch(e){}
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', hideDecorativeIcons);
+    } else { hideDecorativeIcons(); }
+
+    // 4) Improve dialog focus behavior (return focus to opener)
+    var openers = document.querySelectorAll('[data-open]');
+    openers.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-open');
+        var dlg = document.getElementById(id);
+        if (!dlg) return;
+        dlg._returnFocus = btn;
+        if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open','');
+        var first = dlg.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (first) first.focus();
+      });
+    });
+    document.querySelectorAll('dialog button').forEach(function(b){
+      if (b.getAttribute('aria-label') === 'Close' || b.value === 'cancel') {
+        b.addEventListener('click', function(){
+          var dlg = b.closest('dialog'); if (!dlg) return;
+          if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
+          if (dlg._returnFocus && dlg._returnFocus.focus) dlg._returnFocus.focus();
+        });
+      }
+    });
+    document.querySelectorAll('dialog').forEach(function(dlg){
+      dlg.addEventListener('click', function(e){ if(e.target === dlg){ if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open'); if (dlg._returnFocus && dlg._returnFocus.focus) dlg._returnFocus.focus(); }});
+    });
+
+    // 5) Mobile sticky bar wiring — reuse your existing modals & chat
+    var chatBtn = document.querySelector('#mobileActions [data-action="open-chat"]');
+    var chatLauncher = document.getElementById('chatLauncher');
+    var chatWin = document.getElementById('chatWin');
+
+    if (chatBtn && chatLauncher){
+      chatBtn.addEventListener('click', function(){
+        // Prefer your existing launcher behavior for consistency
+        chatLauncher.click();
+        chatBtn.setAttribute('aria-expanded','true');
+        var input = document.getElementById('chatInput'); if (input) input.focus();
+      });
+    }
+
+    // Keep chatLauncher ARIA in sync when window is closed by the X button
+    document.addEventListener('click', function(e){
+      var closeBtn = e.target.closest ? e.target.closest('[data-close="#chatWin"]') : null;
+      if (closeBtn && chatBtn){
+        chatBtn.setAttribute('aria-expanded','false');
+        chatBtn.focus();
+      }
+    });
+
+    // 6) Mobile menu button: add ARIA if present
+    var menuBtn = document.getElementById('menuBtn');
+    if (menuBtn){
+      menuBtn.setAttribute('aria-controls','sidebar');
+      menuBtn.setAttribute('aria-expanded','false');
+      menuBtn.addEventListener('click', function(){
+        // Toggle expanded state based on sidebar visibility
+        var s = document.getElementById('sidebar');
+        var expanded = s ? !s.classList.contains('hidden') : false;
+        menuBtn.setAttribute('aria-expanded', String(expanded));
+      });
+    }
+  })();
+</script>
+  <script>
+(function positionChatAboveSticky(){
+  var chatWin = document.getElementById('chatWin');
+  var chatLauncher = document.getElementById('chatLauncher');
+
+  if (!chatWin || !chatLauncher) return;
+
+  // Always keep chat above sticky bar & other UI
+  chatWin.style.zIndex = '60'; // higher than sticky bar (typically 40/50)
+
+  function liftChatForMobile() {
+    var bar = document.getElementById('mobileActions');
+    var pad = 16; // extra breathing room
+    var bottom = 24; // default desktop bottom offset
+    if (window.matchMedia('(max-width: 768px)').matches && bar) {
+      bottom = (bar.offsetHeight || 80) + pad;
+    }
+    // Apply bottom offset and clear conflicting top/right defaults from dragging
+    chatWin.style.bottom = bottom + 'px';
+    chatWin.style.right = '24px';
+    chatWin.style.left = 'auto';
+    chatWin.style.top = 'auto';
+  }
+
+  // Lift on open (reuse your existing launcher)
+  chatLauncher.addEventListener('click', liftChatForMobile, { passive: true });
+  // Also lift on resize/orientation changes
+  window.addEventListener('resize', liftChatForMobile, { passive: true });
+  window.addEventListener('orientationchange', liftChatForMobile, { passive: true });
+
+  // Initial pass (in case chat starts open)
+  liftChatForMobile();
+})();
+</script>
+
+  <script>
+(function improveChatDragOnTouch(){
+  var chatWin = document.getElementById('chatWin');
+  var chatHeader = document.getElementById('chatHeader');
+  if (!chatWin || !chatHeader) return;
+
+  // Disable native panning on the drag handle so touchmove won't scroll the page
+  chatHeader.style.touchAction = 'none';
+
+  // Enhance your existing handlers by preventing default while dragging
+  var dragging = false, startX=0, startY=0, startLeft=0, startTop=0;
+
+  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+  chatHeader.addEventListener('pointerdown', function(e){
+    // ignore clicks on the close button inside header
+    if (e.target.closest && e.target.closest('[data-close="#chatWin"]')) return;
+
+    dragging = true;
+    try { chatHeader.setPointerCapture(e.pointerId); } catch(_) {}
+    chatWin.classList.add('dragging');
+
+    var rect = chatWin.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop  = rect.top;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    // Prevent page scroll right from the start (important on mobile)
+    e.preventDefault();
+  });
+
+  window.addEventListener('pointermove', function(e){
+    if (!dragging) return;
+    e.preventDefault(); // stop page from scrolling while dragging
+
+    var dx = e.clientX - startX;
+    var dy = e.clientY - startY;
+
+    var newLeft = startLeft + dx;
+    var newTop  = startTop  + dy;
+
+    // Keep the chat window inside the viewport
+    var maxLeft = window.innerWidth  - chatWin.offsetWidth  - 8;
+    var maxTop  = window.innerHeight - chatWin.offsetHeight - 8;
+    newLeft = clamp(newLeft, 8, Math.max(8, maxLeft));
+    newTop  = clamp(newTop,  8, Math.max(8, maxTop));
+
+    chatWin.style.left = newLeft + 'px';
+    chatWin.style.top  = newTop  + 'px';
+    chatWin.style.right = 'auto';
+    chatWin.style.bottom = 'auto';
+  }, { passive: false });
+
+  window.addEventListener('pointerup', function(e){
+    if (!dragging) return;
+    dragging = false;
+    try { chatHeader.releasePointerCapture(e.pointerId); } catch(_) {}
+    chatWin.classList.remove('dragging');
+  });
+
+  // Optional: when opening chat, ensure it starts within the viewport
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('#chatLauncher') : null;
+    if (!btn) return;
+    // Snap to a sane position if it somehow drifted off-screen
+    var rect = chatWin.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight || rect.right > window.innerWidth) {
+      chatWin.style.left = 'auto';
+      chatWin.style.top = 'auto';
+      // bottom is adjusted by the other snippet based on sticky bar height
+    }
+  }, { passive: true });
+})();
+</script>
+  <script>
+(function fixChatOverlapAndDrag(){
+  var chatWin = document.getElementById('chatWin');
+  var chatHeader = document.getElementById('chatHeader');
+  var chatLauncher = document.getElementById('chatLauncher');
+  var sticky = document.getElementById('mobileActions');
+
+  if (!chatWin || !chatHeader || !chatLauncher) return;
+
+  // --- Helpers ---
+  function stickyOffset() {
+    var pad = 16; // spacing above bar
+    if (!sticky) return 24; // desktop/default
+    var h = sticky.offsetHeight || 64;
+    // Only apply on mobile sizes
+    return window.matchMedia('(max-width: 768px)').matches ? (h + pad) : 24;
+  }
+  function liftChat() {
+    // Anchor above sticky bar and to right edge
+    chatWin.style.bottom = stickyOffset() + 'px';
+    chatWin.style.right  = '24px';
+    chatWin.style.left   = 'auto';
+    chatWin.style.top    = 'auto';
+  }
+
+  // Keep chat window above bar on open + on resize/orientation
+  chatLauncher.addEventListener('click', function(){
+    // show window (your code already handles this), then lift
+    setTimeout(liftChat, 0);
+    // avoid launcher covering the chat window
+    chatLauncher.style.opacity = '0';
+    chatLauncher.style.pointerEvents = 'none';
+  }, { passive: true });
+
+  // When chat closes via the "x" button, restore launcher
+  document.addEventListener('click', function(e){
+    var closeBtn = e.target.closest ? e.target.closest('[data-close="#chatWin"]') : null;
+    if (closeBtn) {
+      // small delay to allow your close handler to run
+      setTimeout(function(){
+        chatLauncher.style.opacity = '';
+        chatLauncher.style.pointerEvents = '';
+      }, 0);
+    }
+  });
+
+  window.addEventListener('resize', liftChat, { passive: true });
+  window.addEventListener('orientationchange', liftChat, { passive: true });
+  // Initial placement in case chat starts open
+  liftChat();
+
+  // --- Touch-friendly dragging (prevents page scroll) ---
+  var dragging = false, startX=0, startY=0, startLeft=0, startTop=0;
+
+  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+  chatHeader.addEventListener('pointerdown', function(e){
+    // ignore if clicking the close button inside header
+    if (e.target.closest && e.target.closest('[data-close="#chatWin"]')) return;
+
+    dragging = true;
+    try { chatHeader.setPointerCapture(e.pointerId); } catch(_) {}
+    chatWin.classList.add('dragging');
+
+    var rect = chatWin.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop  = rect.top;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    // Prevent the page from scrolling when we start dragging
+    e.preventDefault();
+    // Reduce rubber-banding/scroll while dragging
+    document.documentElement.style.overscrollBehavior = 'none';
+    document.body.style.overflow = 'hidden';
+  });
+
+  window.addEventListener('pointermove', function(e){
+    if (!dragging) return;
+    e.preventDefault(); // keep the page from scrolling
+
+    var dx = e.clientX - startX;
+    var dy = e.clientY - startY;
+
+    var newLeft = startLeft + dx;
+    var newTop  = startTop  + dy;
+
+    // Keep the chat within the viewport bounds
+    var maxLeft = window.innerWidth  - chatWin.offsetWidth  - 8;
+    var maxTop  = window.innerHeight - chatWin.offsetHeight - 8;
+    newLeft = clamp(newLeft, 8, Math.max(8, maxLeft));
+    newTop  = clamp(newTop,  8, Math.max(8, maxTop));
+
+    chatWin.style.left = newLeft + 'px';
+    chatWin.style.top  = newTop  + 'px';
+    chatWin.style.right = 'auto';
+    chatWin.style.bottom = 'auto';
+  }, { passive: false });
+
+  window.addEventListener('pointerup', function(e){
+    if (!dragging) return;
+    dragging = false;
+    try { chatHeader.releasePointerCapture(e.pointerId); } catch(_) {}
+    chatWin.classList.remove('dragging');
+
+    // Re-enable page scroll
+    document.documentElement.style.overscrollBehavior = '';
+    document.body.style.overflow = '';
+
+    // If the window ended up behind the sticky bar, lift it again
+    var rect = chatWin.getBoundingClientRect();
+    var barH = (sticky && window.matchMedia('(max-width: 768px)').matches) ? (sticky.offsetHeight || 64) : 0;
+    if (rect.bottom > window.innerHeight - barH) liftChat();
+  }, { passive: false });
+})();
+</script>
+
+</body>
+  
+</html>
+
+
+
+
+
+
+
+
+
+
+
