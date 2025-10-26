@@ -425,20 +425,18 @@
       </div>
     </form>
   </dialog>
-  <script>
-  // Where to send chat requests.
-  // When you open the file locally (http://localhost:5173) it will call your local host (http://localhost:8799).
-  // When you publish to GitHub Pages, it will call your public URL (update if you proxy the host).
-  
-const LS_OVERRIDE = localStorage.getItem('HOST_BASE_OVERRIDE');
+<script>
+  // Allow a runtime override (so you can switch backends without republishing)
+  const LS_OVERRIDE = localStorage.getItem('HOST_BASE_OVERRIDE') || '';
 
-const HOST_BASE = LS_OVERRIDE
-  ? LS_OVERRIDE
-  : ((location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  // Default: localhost when served locally; otherwise use your Cloudflare tunnel
+  const HOST_BASE =
+    LS_OVERRIDE ||
+    ((location.hostname === 'localhost' || location.hostname === '127.0.0.1')
       ? 'http://localhost:8799'
       : 'https://intense-metal-knit-everywhere.trycloudflare.com');
 
-console.log('[chat] HOST_BASE =', HOST_BASE);
+  console.log('[chat] HOST_BASE =', HOST_BASE);
 
   async function sendChat(message) {
     const resp = await fetch(`${HOST_BASE}/chat`, {
@@ -452,7 +450,8 @@ console.log('[chat] HOST_BASE =', HOST_BASE);
     }
     return resp.json();
   }
-  </script>
+</script>
+
 
   <script>
     // 1) Lucide init (robust)
