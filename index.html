@@ -425,6 +425,33 @@
       </div>
     </form>
   </dialog>
+  <script>
+  // Where to send chat requests.
+  // When you open the file locally (http://localhost:5173) it will call your local host (http://localhost:8799).
+  // When you publish to GitHub Pages, it will call your public URL (update if you proxy the host).
+  
+const LS_OVERRIDE = localStorage.getItem('HOST_BASE_OVERRIDE');
+
+const HOST_BASE = LS_OVERRIDE
+  ? LS_OVERRIDE
+  : ((location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? 'http://localhost:8799'
+      : 'https://intense-metal-knit-everywhere.trycloudflare.com'  ; 
+      console.log('[chat] HOST_BASE =', HOST_BASE);
+
+  async function sendChat(message) {
+    const resp = await fetch(`${HOST_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`Chat request failed (${resp.status}): ${text}`);
+    }
+    return resp.json();
+  }
+  </script>
 
   <script>
     // 1) Lucide init (robust)
@@ -597,53 +624,69 @@
       }
     });
 
-    
-    // 8) Chat (draggable + close)
-(function () {
+/* 8) Chat (draggable + close) — LIVE version wired to your host */
+(function(){
+  // --- endpoint selection ---
+  // Local file served at http://localhost:5173  -> talk to local host on 8799
+  // Anything else (like GitHub Pages)            -> this URL must be a real backend, NOT GitHub Pages
+  const HOST_BASE =
+    (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? 'http://localhost:8799'
+      : 'https://kvidya09.github.io/CityPermitAssistantPreview/'; // placeholder; GitHub Pages cannot serve /chat
+
+  async function sendChat(message) {
+    const resp = await fetch(`${HOST_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`Chat request failed (${resp.status}): ${text}`);
+    }
+    return resp.json(); // expected: { answer: "..." }
+  }
+
   var chatLauncher = document.getElementById('chatLauncher');
-  var chatWin = document.getElementById('chatWin');
-  var chatHeader = document.getElementById('chatHeader');
-  var chatLog = document.getElementById('chatLog');
-  var chatForm = document.getElementById('chatForm');
-  var chatInput = document.getElementById('chatInput');
+  var chatWin      = document.getElementById('chatWin');
+  var chatHeader   = document.getElementById('chatHeader');
+  var chatLog      = document.getElementById('chatLog');
+  var chatForm     = document.getElementById('chatForm');
+  var chatInput    = document.getElementById('chatInput');
 
-  // close button (X)
-  document.addEventListener('click', function (e) {
+  // open/close
+  document.addEventListener('click', function(e){
     var btn = e.target.closest ? e.target.closest('[data-close="#chatWin"]') : null;
-    if (btn) { chatWin.classList.add('hidden'); }
+    if (btn) chatWin.classList.add('hidden');
   });
-
-  // open chat
-  chatLauncher.addEventListener('click', function () {
+  chatLauncher.addEventListener('click', function(){
     chatWin.classList.remove('hidden');
+    setTimeout(()=> chatInput && chatInput.focus(), 0);
   });
 
-  // drag support (unchanged behavior)
-  (function () {
-    var dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
-    function onPointerDown(e) {
-      if (e.target.closest && e.target.closest('[data-close="#chatWin"]')) return;
-      dragging = true;
-      try { chatHeader.setPointerCapture(e.pointerId); } catch (_) {}
+  // dragging (same behavior as before)
+  (function(){
+    var dragging=false, startX=0, startY=0, startLeft=0, startTop=0;
+    function onPointerDown(e){
+      if(e.target.closest && e.target.closest('[data-close="#chatWin"]')) return;
+      dragging=true;
+      try { chatHeader.setPointerCapture(e.pointerId); } catch(_){}
       chatWin.classList.add('dragging');
-      var rect = chatWin.getBoundingClientRect();
-      startLeft = rect.left; startTop = rect.top;
-      startX = e.clientX; startY = e.clientY;
+      var rect=chatWin.getBoundingClientRect();
+      startLeft=rect.left; startTop=rect.top; startX=e.clientX; startY=e.clientY;
     }
-    function onPointerMove(e) {
-      if (!dragging) return;
-      var dx = e.clientX - startX;
-      var dy = e.clientY - startY;
-      var newLeft = Math.max(8, Math.min(window.innerWidth - chatWin.offsetWidth - 8, startLeft + dx));
-      var newTop = Math.max(8, Math.min(window.innerHeight - chatWin.offsetHeight - 8, startTop + dy));
-      chatWin.style.left = newLeft + 'px';
-      chatWin.style.top = newTop + 'px';
-      chatWin.style.right = 'auto';
-      chatWin.style.bottom = 'auto';
+    function onPointerMove(e){
+      if(!dragging) return;
+      var dx=e.clientX-startX, dy=e.clientY-startY;
+      var newLeft=Math.max(8, Math.min(window.innerWidth-chatWin.offsetWidth-8, startLeft+dx));
+      var newTop =Math.max(8, Math.min(window.innerHeight-chatWin.offsetHeight-8, startTop+dy));
+      chatWin.style.left=newLeft+'px';
+      chatWin.style.top =newTop +'px';
+      chatWin.style.right='auto'; chatWin.style.bottom='auto';
     }
-    function onPointerUp(e) {
-      dragging = false;
-      try { chatHeader.releasePointerCapture(e.pointerId); } catch (_) {}
+    function onPointerUp(e){
+      dragging=false;
+      try { chatHeader.releasePointerCapture(e.pointerId); } catch(_){}
       chatWin.classList.remove('dragging');
     }
     chatHeader.addEventListener('pointerdown', onPointerDown);
@@ -651,66 +694,62 @@
     window.addEventListener('pointerup', onPointerUp);
   })();
 
-  // === NEW: host endpoint + bubble helper ===
-  const HOST_BASE =
-  (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? 'http://localhost:8799'
-    : 'https://intense-metal-knit-everywhere.trycloudflare.com'; // change if you deploy elsewhere
-
-  function appendBubble(target, text, side) {
-    var bubble = document.createElement('div');
-    bubble.className = (side === 'user'
+  // helper to append a message bubble
+  function addBubble(text, side){
+    var div = document.createElement('div');
+    div.className = (side === 'user')
       ? 'ml-auto max-w-[80%] bg-blue-600 text-white px-3 py-2 rounded-xl'
-      : 'mr-auto max-w-[80%] bg-gray-100 px-3 py-2 rounded-xl');
-    bubble.textContent = text;
-    target.appendChild(bubble);
-    target.scrollTop = target.scrollHeight;
-    return bubble;
+      : 'mr-auto max-w-[80%] bg-gray-100 px-3 py-2 rounded-xl';
+    div.textContent = text;
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
   }
 
-  // === UPDATED: real submit handler calling /chat ===
-  chatForm.addEventListener('submit', async function (e) {
+  // helper to show/hide a typing line
+  function showTyping(show){
+    let el = chatLog.querySelector('[data-typing]');
+    if (show) {
+      if (!el) {
+        el = document.createElement('div');
+        el.setAttribute('data-typing','');
+        el.className = 'text-gray-500 text-sm';
+        el.textContent = 'Assistant is typing...';
+        chatLog.appendChild(el);
+      }
+    } else if (el) {
+      el.remove();
+    }
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  // --- submit handler: now talks to backend ---
+   chatForm.addEventListener('submit', async function(e){
     e.preventDefault();
+    var msg = (chatInput && chatInput.value || '').trim();
+    if (!msg) return;
 
-    var msgVal = (chatInput && chatInput.value) ? chatInput.value.trim() : '';
-    if (!msgVal) return;
-
-    // user bubble
-    appendBubble(chatLog, msgVal, 'user');
+    addBubble(msg, 'user');
     chatInput.value = '';
 
-    // typing indicator
-    var typing = document.createElement('div');
-    typing.className = 'text-gray-500 text-sm';
-    typing.textContent = 'Assistant is typing…';
-    chatLog.appendChild(typing);
-    chatLog.scrollTop = chatLog.scrollHeight;
-
+    showTyping(true);
     try {
-      var resp = await fetch(HOST_BASE + '/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msgVal })
-      });
-
-      var data = await resp.json();
-      typing.remove();
-
-      if (resp.ok && data && typeof data.answer === 'string') {
-        appendBubble(chatLog, data.answer, 'assistant');
-      } else {
-        var errText = data && data.error
-          ? (typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
-          : 'Unknown server response';
-        appendBubble(chatLog, 'Error: ' + errText, 'assistant');
-      }
+      const data = await sendChat(msg);
+      const text = (data && (data.answer || data.content || data.message)) || 'No answer.';
+      showTyping(false);
+      addBubble(text, 'ai');
     } catch (err) {
-      typing.remove();
-      appendBubble(chatLog, 'Network error: ' + err, 'assistant');
+      showTyping(false);
+      // Common causes: CORS, mixed content (https page → http API), host down, timeout
+      addBubble(
+        'Could not contact the chat backend. ' +
+        'If you are on GitHub Pages, ensure HOST_BASE is a public HTTPS URL and CORS is enabled. ' +
+        'Details: ' + (err?.message || String(err)),
+        'ai'
+      );
+      console.error(err);
     }
   });
 })();
-
 
     // 9) "Submit your question" -> fake email wiring
     (function(){ var submitModal=document.getElementById('submitModal'); var cancelSubmit=document.getElementById('cancelSubmit'); var closeBtn=submitModal.querySelector('[aria-label="Close"]'); var form=document.getElementById('submitForm'); var msg=document.getElementById('submitMsg'); if(cancelSubmit) cancelSubmit.addEventListener('click', function(){ closeDialog(submitModal); }); if(closeBtn) closeBtn.addEventListener('click', function(){ closeDialog(submitModal); }); form.addEventListener('submit', function(e){ e.preventDefault(); var data={ topic:document.getElementById('topic').value, permitType:document.getElementById('permitType').value, question:document.getElementById('question').value, email:document.getElementById('email').value }; console.log('Simulated email send to abccity@city.gov', data); if(msg) msg.classList.remove('hidden'); setTimeout(function(){ closeDialog(submitModal); alert('Form submitted successfully! (sent to abccity@city.gov - simulation)'); form.reset(); if(msg) msg.classList.add('hidden'); }, 800); }); })();
@@ -1084,9 +1123,6 @@
 </body>
   
 </html>
-
-
-
 
 
 
