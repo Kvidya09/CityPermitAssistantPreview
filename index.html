@@ -436,8 +436,9 @@ const HOST_BASE = LS_OVERRIDE
   ? LS_OVERRIDE
   : ((location.hostname === 'localhost' || location.hostname === '127.0.0.1')
       ? 'http://localhost:8799'
-      : 'https://intense-metal-knit-everywhere.trycloudflare.com'  ; 
-      console.log('[chat] HOST_BASE =', HOST_BASE);
+      : 'https://intense-metal-knit-everywhere.trycloudflare.com');
+
+console.log('[chat] HOST_BASE =', HOST_BASE);
 
   async function sendChat(message) {
     const resp = await fetch(`${HOST_BASE}/chat`, {
