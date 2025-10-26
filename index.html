@@ -652,7 +652,10 @@
   })();
 
   // === NEW: host endpoint + bubble helper ===
-  const HOST_BASE = 'http://localhost:8799'; // change if you deploy elsewhere
+  cconst HOST_BASE =
+  (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'http://localhost:8799'
+    : 'https://intense-metal-knit-everywhere.trycloudflare.com'; // change if you deploy elsewhere
 
   function appendBubble(target, text, side) {
     var bubble = document.createElement('div');
@@ -1081,6 +1084,7 @@
 </body>
   
 </html>
+
 
 
 
