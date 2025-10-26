@@ -425,33 +425,6 @@
       </div>
     </form>
   </dialog>
-<script>
-  // Allow a runtime override (so you can switch backends without republishing)
-  const LS_OVERRIDE = localStorage.getItem('HOST_BASE_OVERRIDE') || '';
-
-  // Default: localhost when served locally; otherwise use your Cloudflare tunnel
-  const HOST_BASE =
-    LS_OVERRIDE ||
-    ((location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-      ? 'http://localhost:8799'
-      : 'https://intense-metal-knit-everywhere.trycloudflare.com');
-
-  console.log('[chat] HOST_BASE =', HOST_BASE);
-
-  async function sendChat(message) {
-    const resp = await fetch(`${HOST_BASE}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
-    });
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '');
-      throw new Error(`Chat request failed (${resp.status}): ${text}`);
-    }
-    return resp.json();
-  }
-</script>
-
 
   <script>
     // 1) Lucide init (robust)
@@ -625,15 +598,20 @@
     });
 
 /* 8) Chat (draggable + close) — LIVE version wired to your host */
-(function(){
-  // --- endpoint selection ---
-  // Local file served at http://localhost:5173  -> talk to local host on 8799
-  // Anything else (like GitHub Pages)            -> this URL must be a real backend, NOT GitHub Pages
-  const HOST_BASE =
-    (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-      ? 'http://localhost:8799'
-      : 'https://kvidya09.github.io/CityPermitAssistantPreview/'; // placeholder; GitHub Pages cannot serve /chat
+(function () {
+  // Let yourself override at runtime (useful for testing)
+  const LS_OVERRIDE = localStorage.getItem('HOST_BASE_OVERRIDE') || '';
 
+  // Endpoint selection: localhost for local dev, Cloudflare tunnel for Pages
+  const HOST_BASE =
+    LS_OVERRIDE ||
+    ((location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? 'http://localhost:8799'
+      : 'https://intense-metal-knit-everywhere.trycloudflare.com'); // no trailing slash
+
+  console.log('[chat] HOST_BASE =', HOST_BASE);
+
+  // Single, definitive chat caller
   async function sendChat(message) {
     const resp = await fetch(`${HOST_BASE}/chat`, {
       method: 'POST',
@@ -644,102 +622,94 @@
       const text = await resp.text().catch(() => '');
       throw new Error(`Chat request failed (${resp.status}): ${text}`);
     }
-    return resp.json(); // expected: { answer: "..." }
+    return resp.json();
   }
 
-  var chatLauncher = document.getElementById('chatLauncher');
-  var chatWin      = document.getElementById('chatWin');
-  var chatHeader   = document.getElementById('chatHeader');
-  var chatLog      = document.getElementById('chatLog');
-  var chatForm     = document.getElementById('chatForm');
-  var chatInput    = document.getElementById('chatInput');
+  // --- UI wiring (unchanged) ---
+  const chatLauncher = document.getElementById('chatLauncher');
+  const chatWin      = document.getElementById('chatWin');
+  const chatHeader   = document.getElementById('chatHeader');
+  const chatLog      = document.getElementById('chatLog');
+  const chatForm     = document.getElementById('chatForm');
+  const chatInput    = document.getElementById('chatInput');
 
-  // open/close
-  document.addEventListener('click', function(e){
-    var btn = e.target.closest ? e.target.closest('[data-close="#chatWin"]') : null;
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('[data-close="#chatWin"]');
     if (btn) chatWin.classList.add('hidden');
   });
-  chatLauncher.addEventListener('click', function(){
+  chatLauncher.addEventListener('click', () => {
     chatWin.classList.remove('hidden');
-    setTimeout(()=> chatInput && chatInput.focus(), 0);
+    setTimeout(() => chatInput?.focus(), 0);
   });
 
-  // dragging (same behavior as before)
-  (function(){
-    var dragging=false, startX=0, startY=0, startLeft=0, startTop=0;
-    function onPointerDown(e){
-      if(e.target.closest && e.target.closest('[data-close="#chatWin"]')) return;
+  (function () {
+    let dragging=false, startX=0, startY=0, startLeft=0, startTop=0;
+    function onDown(e){
+      if (e.target.closest?.('[data-close="#chatWin"]')) return;
       dragging=true;
-      try { chatHeader.setPointerCapture(e.pointerId); } catch(_){}
+      try { chatHeader.setPointerCapture(e.pointerId); } catch {}
       chatWin.classList.add('dragging');
-      var rect=chatWin.getBoundingClientRect();
-      startLeft=rect.left; startTop=rect.top; startX=e.clientX; startY=e.clientY;
+      const r=chatWin.getBoundingClientRect();
+      startLeft=r.left; startTop=r.top; startX=e.clientX; startY=e.clientY;
     }
-    function onPointerMove(e){
+    function onMove(e){
       if(!dragging) return;
-      var dx=e.clientX-startX, dy=e.clientY-startY;
-      var newLeft=Math.max(8, Math.min(window.innerWidth-chatWin.offsetWidth-8, startLeft+dx));
-      var newTop =Math.max(8, Math.min(window.innerHeight-chatWin.offsetHeight-8, startTop+dy));
+      const dx=e.clientX-startX, dy=e.clientY-startY;
+      const newLeft=Math.max(8, Math.min(window.innerWidth-chatWin.offsetWidth-8, startLeft+dx));
+      const newTop =Math.max(8, Math.min(window.innerHeight-chatWin.offsetHeight-8, startTop+dy));
       chatWin.style.left=newLeft+'px';
       chatWin.style.top =newTop +'px';
       chatWin.style.right='auto'; chatWin.style.bottom='auto';
     }
-    function onPointerUp(e){
+    function onUp(e){
       dragging=false;
-      try { chatHeader.releasePointerCapture(e.pointerId); } catch(_){}
+      try { chatHeader.releasePointerCapture(e.pointerId); } catch {}
       chatWin.classList.remove('dragging');
     }
-    chatHeader.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    chatHeader.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   })();
 
-  // helper to append a message bubble
   function addBubble(text, side){
-    var div = document.createElement('div');
-    div.className = (side === 'user')
+    const div=document.createElement('div');
+    div.className = side==='user'
       ? 'ml-auto max-w-[80%] bg-blue-600 text-white px-3 py-2 rounded-xl'
       : 'mr-auto max-w-[80%] bg-gray-100 px-3 py-2 rounded-xl';
-    div.textContent = text;
+    div.textContent=text;
     chatLog.appendChild(div);
-    chatLog.scrollTop = chatLog.scrollHeight;
+    chatLog.scrollTop=chatLog.scrollHeight;
   }
-
-  // helper to show/hide a typing line
   function showTyping(show){
-    let el = chatLog.querySelector('[data-typing]');
+    let el=chatLog.querySelector('[data-typing]');
     if (show) {
       if (!el) {
-        el = document.createElement('div');
+        el=document.createElement('div');
         el.setAttribute('data-typing','');
-        el.className = 'text-gray-500 text-sm';
-        el.textContent = 'Assistant is typing...';
+        el.className='text-gray-500 text-sm';
+        el.textContent='Assistant is typing...';
         chatLog.appendChild(el);
       }
-    } else if (el) {
-      el.remove();
-    }
-    chatLog.scrollTop = chatLog.scrollHeight;
+    } else if (el) el.remove();
+    chatLog.scrollTop=chatLog.scrollHeight;
   }
 
-  // --- submit handler: now talks to backend ---
-   chatForm.addEventListener('submit', async function(e){
+  chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    var msg = (chatInput && chatInput.value || '').trim();
+    const msg=(chatInput?.value||'').trim();
     if (!msg) return;
 
     addBubble(msg, 'user');
-    chatInput.value = '';
+    chatInput.value='';
 
     showTyping(true);
     try {
       const data = await sendChat(msg);
-      const text = (data && (data.answer || data.content || data.message)) || 'No answer.';
+      const text = data?.answer || data?.content || data?.message || 'No answer.';
       showTyping(false);
-      addBubble(text, 'ai');
+      addBubble(text,'ai');
     } catch (err) {
       showTyping(false);
-      // Common causes: CORS, mixed content (https page → http API), host down, timeout
       addBubble(
         'Could not contact the chat backend. ' +
         'If you are on GitHub Pages, ensure HOST_BASE is a public HTTPS URL and CORS is enabled. ' +
@@ -750,6 +720,7 @@
     }
   });
 })();
+
 
     // 9) "Submit your question" -> fake email wiring
     (function(){ var submitModal=document.getElementById('submitModal'); var cancelSubmit=document.getElementById('cancelSubmit'); var closeBtn=submitModal.querySelector('[aria-label="Close"]'); var form=document.getElementById('submitForm'); var msg=document.getElementById('submitMsg'); if(cancelSubmit) cancelSubmit.addEventListener('click', function(){ closeDialog(submitModal); }); if(closeBtn) closeBtn.addEventListener('click', function(){ closeDialog(submitModal); }); form.addEventListener('submit', function(e){ e.preventDefault(); var data={ topic:document.getElementById('topic').value, permitType:document.getElementById('permitType').value, question:document.getElementById('question').value, email:document.getElementById('email').value }; console.log('Simulated email send to abccity@city.gov', data); if(msg) msg.classList.remove('hidden'); setTimeout(function(){ closeDialog(submitModal); alert('Form submitted successfully! (sent to abccity@city.gov - simulation)'); form.reset(); if(msg) msg.classList.add('hidden'); }, 800); }); })();
